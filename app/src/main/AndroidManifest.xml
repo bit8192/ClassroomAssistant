@@ -20,7 +20,7 @@
             android:name=".AudioRecordService"
             android:enabled="true"
             android:exported="true"
-            android:permission="" />
+            android:foregroundServiceType="microphone" />
 
         <activity
             android:name=".RecordActivity"

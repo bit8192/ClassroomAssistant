@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
+import java.nio.file.Paths
+import kotlin.io.path.deleteIfExists
 
 class FileInfoViewModel(fileInfo: FileInfo): ViewModel() {
     val path = mutableStateOf(fileInfo.path)
@@ -61,5 +63,10 @@ class FileInfoViewModel(fileInfo: FileInfo): ViewModel() {
             recordedTime += System.currentTimeMillis() - startTime
             _recordTime.value = 0
         }
+    }
+
+    fun delete() {
+        isStart.value = false
+        Paths.get(path.value).deleteIfExists()
     }
 }
