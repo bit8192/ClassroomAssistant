@@ -1,5 +1,6 @@
 package cn.bincker.classroom.assistant.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -8,5 +9,7 @@ data class Course(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val createTime: Long,
-    val summary: String
+    val summary: String,
+    @ColumnInfo(typeAffinity = ColumnInfo.TEXT)
+    val files: List<FileInfo>
 )

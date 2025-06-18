@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -12,6 +16,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ClassroomAssistant"
         tools:targetApi="31">
+        <service
+            android:name=".AudioRecordService"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="" />
+
         <activity
             android:name=".RecordActivity"
             android:exported="false" />
