@@ -1,24 +1,25 @@
 package cn.bincker.classroom.assistant
 
-import android.Manifest.permission
 import android.content.ComponentName
 import android.content.Context.BIND_AUTO_CREATE
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -40,6 +41,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -63,58 +65,53 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import cn.bincker.classroom.assistant.RecordActivity.RecordServiceConnection
+import cn.bincker.classroom.assistant.asr.FULL_SERVER_RESPONSE
 import cn.bincker.classroom.assistant.data.entity.FileInfo
 import cn.bincker.classroom.assistant.ui.theme.ClassroomAssistantTheme
 import cn.bincker.classroom.assistant.vm.FileInfoViewModel
 import cn.bincker.classroom.assistant.vm.RecordActivityViewModel
+import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 
 class RecordActivity : ComponentActivity() {
-    companion object{
-        private const val REQUEST_CODE_PERMISSION = 1
-    }
     private val vm: RecordActivityViewModel by viewModels<RecordActivityViewModel>()
-    private val serviceConnection = RecordServiceConnection()
+    private val serviceConnection = RecordServiceConnection().apply {
+        onServiceConnectionListener = {
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    audioRecordBinder?.asrResponseStateFlow?.collect { response->
+                        if (response.messageType != FULL_SERVER_RESPONSE.toInt()) return@collect
+                        val currentRecorder = vm.fileInfos[vm.pagerState.currentPage]
+                        currentRecorder.onMessage(response)
+                    }
+                }
+            }
+        }
+    }
 
     class RecordServiceConnection: ServiceConnection{
-        private var audioRecordBinder: AudioRecordService.AudioRecordBinder? = null
+        private var _audioRecordBinder: AudioRecordService.AudioRecordBinder? = null
+        val audioRecordBinder: AudioRecordService.AudioRecordBinder?
+            get() = _audioRecordBinder
         var isBind = false
+        var onServiceConnectionListener: (()->Unit)? = null
         override fun onServiceConnected(
-            name: ComponentName?,
-            binder: IBinder?
+            name: ComponentName,
+            binder: IBinder
         ) {
-            if (binder != null){
-                audioRecordBinder = binder as AudioRecordService.AudioRecordBinder
-                isBind = true
-            }
-
+            _audioRecordBinder = binder as AudioRecordService.AudioRecordBinder
+            isBind = true
+            onServiceConnectionListener?.invoke()
         }
 
         override fun onServiceDisconnected(p0: ComponentName?) {
             isBind = false
-            audioRecordBinder = null
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                permission.RECORD_AUDIO
-            )
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf<String?>(
-                    permission.RECORD_AUDIO,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) permission.FOREGROUND_SERVICE_MICROPHONE else null
-                ),
-                REQUEST_CODE_PERMISSION
-            )
+            _audioRecordBinder = null
         }
     }
 
@@ -157,9 +154,22 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
     val blankTitle = remember { mutableStateOf(false) }
     val course = viewModel.course.collectAsState()
     val courseTitle = remember { mutableStateOf("") }
-    val pagerState = rememberPagerState { viewModel.fileInfos.size }
+    val pagerState = viewModel.pagerState
     val showAddContentChooseDialog = remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val selectImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let { viewModel.addImage(uri) }
+        }
+    )
+    val selectAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let { viewModel.addAudio(context, uri) }
+        }
+    )
+    val tabScrollState = rememberScrollState()
     if (!blankTitle.value && course.value.title.isBlank()){
         AlertDialog(
             onDismissRequest = {},
@@ -190,26 +200,31 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
     }
     if (showAddContentChooseDialog.value){
         Dialog({showAddContentChooseDialog.value = false}) {
-            Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
-                Text("录制音频", modifier = Modifier
-                    .padding(85.dp, 15.dp)
-                    .clickable {
-                        showAddContentChooseDialog.value = false
-                        viewModel.addAudioRecord(context)
-                    })
-                Text("图片/照片", modifier = Modifier
-                    .padding(85.dp, 15.dp)
-                    .clickable {
-                        showAddContentChooseDialog.value = false
-                        //TODO
-                    })
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.background), horizontalAlignment = Alignment.CenterHorizontally) {
+                TextButton({
+                    showAddContentChooseDialog.value = false
+                    viewModel.addAudioRecord(context)
+                }, modifier = Modifier.fillMaxWidth()) { Text("录制音频", modifier = Modifier.padding(85.dp, 15.dp)) }
+                TextButton({
+                    showAddContentChooseDialog.value = false
+//                    selectAudioLauncher.launch("audio/*")
+                    Toast.makeText(context, "暂不支持该功能", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.fillMaxWidth()){ Text("本地录音/音频", modifier = Modifier.padding(85.dp, 15.dp)) }
+                TextButton({
+                    showAddContentChooseDialog.value = false
+                    selectImageLauncher.launch("image/*")
+                }, modifier = Modifier.fillMaxWidth()){ Text("图片/照片", modifier = Modifier.padding(85.dp, 15.dp)) }
+                TextButton({
+                    showAddContentChooseDialog.value = false
+                    //TODO
+                }, modifier = Modifier.fillMaxWidth()){ Text("完成/AI总结", modifier = Modifier.padding(85.dp, 15.dp)) }
             }
         }
     }
     Column(modifier = modifier
         .fillMaxSize()
         .padding(top = 54.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (viewModel.fileInfos.size == 0){
+        if (viewModel.fileInfos.isEmpty()){
             Column(modifier = Modifier
                 .clickable { showAddContentChooseDialog.value = true }
                 .weight(1f)
@@ -227,17 +242,19 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
                         viewModel.deleteFile(page)
                     })
                 } else {
-                    ImageFileView(vm = fileInfo)
+                    ImageFileView(vm = fileInfo, onDelete = {
+                        viewModel.deleteFile(page)
+                    })
                 }
             }
         }
         HorizontalDivider()
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(tabScrollState), horizontalArrangement = Arrangement.Start) {
             repeat(viewModel.fileInfos.size) { index->
                 Box(modifier = Modifier
                     .size(60.dp)
-                    .background(Color.Gray), contentAlignment = Alignment.Center) {
-                    Text(viewModel.fileInfos[index].fileName)
+                    .background(if (pagerState.currentPage == index) colorResource(R.color.purple_500) else Color.Gray), contentAlignment = Alignment.Center) {
+                    Text(viewModel.fileInfos[index].fileName, color = if (pagerState.currentPage == index) Color.White else LocalContentColor.current)
                 }
             }
             IconButton({showAddContentChooseDialog.value = true}, modifier = Modifier.size(60.dp)) {
@@ -249,11 +266,12 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
 
 @Composable
 fun RecordView(modifier: Modifier = Modifier, vm: FileInfoViewModel, serviceConnection: RecordServiceConnection, onDelete: ()->Unit = {}){
-    val recordTime by vm.recordTimeText.collectAsState("")
+    val recordTimeText by vm.recordTimeText.collectAsState("")
+    val recordTime by vm.recordedTime
     val isStart by vm.isStart
     val context = LocalContext.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(recordTime, fontSize = 54.sp, modifier = Modifier.padding(vertical = 50.dp))
+        Text(recordTimeText, fontSize = 54.sp, modifier = Modifier.padding(vertical = 50.dp))
         STTList(modifier = Modifier.weight(1f), content = vm.description)
         IconButton(
             modifier = Modifier
@@ -263,27 +281,26 @@ fun RecordView(modifier: Modifier = Modifier, vm: FileInfoViewModel, serviceConn
             onClick = {
                 if (isStart) {
                     vm.stop()
+                    val intent = Intent(context, AudioRecordService::class.java)
+                    intent.putExtra("command", AudioRecordService.Companion.Command.Stop.ordinal)
+                    context.startService(intent)
                     context.unbindService(serviceConnection)
+                    serviceConnection.isBind = false
                 }else{
                     if (serviceConnection.isBind) {
                         Toast.makeText(context, "正在录制中，无法重复录制", Toast.LENGTH_SHORT).show()
                     }else{
-                        if (ContextCompat.checkSelfPermission(
-                                context,
-                                permission.RECORD_AUDIO
-                            )
-                            == PackageManager.PERMISSION_GRANTED
-                        ) {
-                            vm.start()
-                            val intent = Intent(context, AudioRecordService::class.java)
-                            intent.putExtra("path", vm.path.value)
-                            context.bindService(intent, serviceConnection, BIND_AUTO_CREATE)
-                        }
+                        vm.start()
+                        context.bindService(Intent(context, AudioRecordService::class.java), serviceConnection, BIND_AUTO_CREATE)
+                        val intent = Intent(context, AudioRecordService::class.java)
+                        intent.putExtra("path", vm.path.value)
+                        intent.putExtra("command", AudioRecordService.Companion.Command.Start.ordinal)
+                        context.startService(intent)
                     }
                 }
             }
         ) {
-            Text(if(isStart) "停止" else "开始", color = Color.White)
+            Text(if(isStart) "停止" else if (recordTime == 0L) "开始" else "继续", color = Color.White)
         }
         IconButton(onDelete, modifier = Modifier.size(60.dp, 40.dp)) {
             Icon(Icons.Filled.Delete, contentDescription = "delete")
@@ -292,16 +309,24 @@ fun RecordView(modifier: Modifier = Modifier, vm: FileInfoViewModel, serviceConn
 }
 
 @Composable
-fun ImageFileView(modifier: Modifier = Modifier, vm: FileInfoViewModel){
+fun ImageFileView(modifier: Modifier = Modifier, vm: FileInfoViewModel, onDelete: () -> Unit){
+    val context = LocalContext.current
     val bitmap = remember(vm.path.value) {
         mutableStateOf<Bitmap?>(null)
     }
     LaunchedEffect(vm.path.value) {
-        bitmap.value = BitmapFactory.decodeFile(vm.path.value)
+        if (vm.path.value.startsWith("content://")){
+            bitmap.value = BitmapFactory.decodeStream(context.contentResolver.openInputStream(vm.path.value.toUri()))
+        }else{
+            bitmap.value = BitmapFactory.decodeFile(vm.path.value)
+        }
     }
     Column(modifier = modifier) {
         bitmap.value?.let {
             Image(bitmap = it.asImageBitmap(), modifier = Modifier.fillMaxSize(), contentDescription = "Image")
+        }
+        IconButton(onDelete, modifier = Modifier.size(60.dp, 40.dp)) {
+            Icon(Icons.Filled.Delete, contentDescription = "delete")
         }
     }
 }
@@ -312,6 +337,6 @@ fun RecordActivityPreview() {
     val vm = RecordActivityViewModel()
     vm.setTitle("test")
     vm.addAudioRecord(LocalContext.current)
-    val serviceConnection = RecordActivity.RecordServiceConnection()
+    val serviceConnection = RecordServiceConnection()
     RecordApp(viewModel = vm, serviceConnection = serviceConnection)
 }

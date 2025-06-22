@@ -1,12 +1,18 @@
 package cn.bincker.classroom.assistant.vm
 
 import android.content.Context
+import android.net.Uri
+import android.util.Log
+import android.widget.Toast
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cn.bincker.classroom.assistant.asr.BytedanceAsrFileApi
 import cn.bincker.classroom.assistant.data.entity.Course
 import cn.bincker.classroom.assistant.data.entity.FileInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +26,8 @@ class RecordActivityViewModel : ViewModel(){
     val course = _course.asStateFlow()
 
     val fileInfos = mutableStateListOf<FileInfoViewModel>()
+
+    val pagerState = PagerState { fileInfos.size }
 
     fun setTitle(title: String){
         _course.update {
@@ -39,5 +47,24 @@ class RecordActivityViewModel : ViewModel(){
     fun deleteFile(index: Int){
         val file = fileInfos.removeAt(index)
         file.delete()
+    }
+
+    fun addImage(imageUri: Uri) {
+        fileInfos.add(FileInfoViewModel(FileInfo(
+            imageUri.toString(),
+            FileInfo.Companion.FileType.IMAGE,
+            System.currentTimeMillis(),
+            ""
+        )))
+    }
+
+    fun addAudio(context: Context, audioUri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                BytedanceAsrFileApi("", "").uploadFile(context, audioUri.toString())
+            }catch (e: Exception){
+                Log.e("RecordActivityViewModel.addAudio", "upload failed", e)
+            }
+        }
     }
 }

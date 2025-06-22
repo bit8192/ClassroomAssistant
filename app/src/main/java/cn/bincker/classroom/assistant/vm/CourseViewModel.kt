@@ -1,5 +1,6 @@
 package cn.bincker.classroom.assistant.vm
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cn.bincker.classroom.assistant.data.dao.CourseDao
@@ -15,6 +16,9 @@ class CourseViewModel(private val courseDao: CourseDao) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    val viewPermissionDeniedDialog = mutableStateOf(false)
+    val deniedPermissionContent = mutableStateOf("")
 
     fun loadCourses() {
         viewModelScope.launch {

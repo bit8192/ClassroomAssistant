@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -8,7 +10,7 @@ plugins {
 android {
     namespace = "cn.bincker.classroom.assistant"
     compileSdk = 35
-
+    buildFeatures.buildConfig = true
     defaultConfig {
         applicationId = "cn.bincker.classroom.assistant"
         minSdk = 29
@@ -17,6 +19,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val properties = Properties()
+        properties.load(project.rootProject.file("local.properties").inputStream())
+        buildConfigField("String", "BYTEDANCE_APPPID", "\"${properties["bytedance.appid"]}\"")
+        buildConfigField("String", "BYTEDANCE_ACCESS_TOKEN", "\"${properties["bytedance.access_token"]}\"")
     }
 
     buildTypes {
@@ -58,6 +65,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     implementation(libs.gson)
+    implementation(libs.okhttp)
+    implementation(libs.java.websocket)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
