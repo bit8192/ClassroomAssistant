@@ -24,6 +24,7 @@ android {
         properties.load(project.rootProject.file("local.properties").inputStream())
         buildConfigField("String", "BYTEDANCE_APPPID", "\"${properties["bytedance.appid"]}\"")
         buildConfigField("String", "BYTEDANCE_ACCESS_TOKEN", "\"${properties["bytedance.access_token"]}\"")
+        buildConfigField("String", "BYTEDANCE_APIKEY", "\"${properties["bytedance.api_key"]}\"")
     }
 
     buildTypes {

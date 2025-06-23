@@ -1,9 +1,7 @@
 package cn.bincker.classroom.assistant.asr
 
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import com.google.gson.Gson
-import com.google.gson.JsonObject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +51,7 @@ class BytedanceAsrClient: WebSocketListener {
         get() = _ready
     private val readyChannel = Channel<Boolean>()
     private val gson = Gson()
-    val messageFlow = MutableStateFlow(AsrResponse())
+    val messageFlow = MutableStateFlow(AsrStreamResponse())
 
     constructor(appId: String, token: String, sampleRate: Int, channels: Int) : super() {
         this.sampleRate = sampleRate
@@ -291,8 +289,8 @@ class BytedanceAsrClient: WebSocketListener {
     }
 
 
-    fun parserResponse(res: ByteArray): AsrResponse {
-        if (res.isEmpty()) return AsrResponse()
+    fun parserResponse(res: ByteArray): AsrStreamResponse {
+        if (res.isEmpty()) return AsrStreamResponse()
         // 当符号位为1时进行 >> 运算后高位补1（预期是补0），导致结果错误，所以增加个数再与其& 运算，目的是确保高位是补0.
         val num: Byte = 15
         // header 32 bit=4 byte
@@ -322,7 +320,7 @@ class BytedanceAsrClient: WebSocketListener {
             String(payloadData)
         }
         Log.d("BytedanceAsrClient.parseResponse", payloadStr)
-        return AsrResponse(
+        return AsrStreamResponse(
             sequence,
             serializationMethod,
             protocolVersion,
@@ -332,7 +330,7 @@ class BytedanceAsrClient: WebSocketListener {
             messageType,
             payloadSize,
             messageTypeSpecificFlags,
-            gson.fromJson<AsrResponse.Companion.Payload>(payloadStr, AsrResponse.Companion.Payload::class.java)
+            gson.fromJson<AsrResponse>(payloadStr, AsrResponse::class.java)
         )
     }
 

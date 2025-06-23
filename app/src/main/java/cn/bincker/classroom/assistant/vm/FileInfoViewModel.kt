@@ -1,12 +1,18 @@
 package cn.bincker.classroom.assistant.vm
 
+import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import cn.bincker.classroom.assistant.asr.AsrResponse
+import cn.bincker.classroom.assistant.BuildConfig
+import cn.bincker.classroom.assistant.asr.AsrRequest
+import cn.bincker.classroom.assistant.asr.AsrStreamResponse
+import cn.bincker.classroom.assistant.asr.BytedanceAsrFileApi
 import cn.bincker.classroom.assistant.data.entity.FileInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -96,7 +102,7 @@ class FileInfoViewModel(fileInfo: FileInfo): ViewModel() {
     }
 
     private var newLine = true
-    fun onMessage(response: AsrResponse) {
+    fun onMessage(response: AsrStreamResponse) {
         response.payload.result.let { result->
             if (result.text.isEmpty()) return@let
             if (newLine){
@@ -138,5 +144,19 @@ class FileInfoViewModel(fileInfo: FileInfo): ViewModel() {
         val bytes = ByteArray(2)
         read(bytes)
         return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).short
+    }
+
+    fun asr(context: Context, audioUri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            loading.value = true
+            try {
+                val api = BytedanceAsrFileApi(BuildConfig.BYTEDANCE_APPPID, BuildConfig.BYTEDANCE_ACCESS_TOKEN)
+                val requestId = api.submit(context, audioUri.toString(), AsrRequest(request = AsrRequest.Request()))
+                val result = api.query(requestId)
+                description.addAll(result.result.text.split("\n"))
+            }finally {
+                loading.value = false
+            }
+        }
     }
 }

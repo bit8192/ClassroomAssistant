@@ -2,27 +2,25 @@ package cn.bincker.classroom.assistant.vm
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cn.bincker.classroom.assistant.BuildConfig
+import cn.bincker.classroom.assistant.ClassroomAssistantApplication
+import cn.bincker.classroom.assistant.asr.AsrRequest
 import cn.bincker.classroom.assistant.asr.BytedanceAsrFileApi
 import cn.bincker.classroom.assistant.data.entity.Course
 import cn.bincker.classroom.assistant.data.entity.FileInfo
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 
 class RecordActivityViewModel : ViewModel(){
-    private val _course = MutableStateFlow(Course(0, "", System.currentTimeMillis(), "新建课程", emptyList()))
+    private val _course = MutableStateFlow(Course(0, "", System.currentTimeMillis(), "新建课程", emptyList(), ""))
     val course = _course.asStateFlow()
 
     val fileInfos = mutableStateListOf<FileInfoViewModel>()
@@ -59,12 +57,23 @@ class RecordActivityViewModel : ViewModel(){
     }
 
     fun addAudio(context: Context, audioUri: Uri) {
+        viewModelScope.launch {
+            val model = FileInfoViewModel(FileInfo(
+                audioUri.toString(),
+                FileInfo.Companion.FileType.AUDIO,
+                System.currentTimeMillis(),
+                ""
+            ))
+            fileInfos.add(model)
+            model.asr(context, audioUri)
+        }
+    }
+
+    fun save(context: Context) {
+        val applicationContext = context.applicationContext as ClassroomAssistantApplication
+        _course.value.files = fileInfos.map { it.getFileInfo() }
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                BytedanceAsrFileApi("", "").uploadFile(context, audioUri.toString())
-            }catch (e: Exception){
-                Log.e("RecordActivityViewModel.addAudio", "upload failed", e)
-            }
+            applicationContext.db.courseDao().insertCourse(_course.value)
         }
     }
 }

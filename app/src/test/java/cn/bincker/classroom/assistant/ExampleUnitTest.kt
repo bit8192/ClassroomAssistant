@@ -1,6 +1,8 @@
 package cn.bincker.classroom.assistant
 
 import android.util.Log
+import cn.bincker.classroom.assistant.chat.ChatMessage
+import com.google.gson.Gson
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,10 +40,5 @@ class ExampleUnitTest {
             }
             job.join()
         }
-    }
-
-    @Test
-    fun log() {
-        Log.d("test", "test")
     }
 }

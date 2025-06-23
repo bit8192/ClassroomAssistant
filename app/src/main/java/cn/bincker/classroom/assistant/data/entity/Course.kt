@@ -7,9 +7,10 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "courses")
 data class Course(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val title: String,
-    val createTime: Long,
-    val summary: String,
+    var title: String,
+    var createTime: Long,
+    var summary: String,
     @ColumnInfo(typeAffinity = ColumnInfo.TEXT)
-    val files: List<FileInfo>
+    var files: List<FileInfo>,
+    var content: String
 )

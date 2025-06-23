@@ -11,12 +11,11 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
-import cn.bincker.classroom.assistant.asr.AsrResponse
+import cn.bincker.classroom.assistant.asr.AsrStreamResponse
 import cn.bincker.classroom.assistant.asr.BytedanceAsrClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -189,7 +188,7 @@ class AudioRecordService : Service() {
     }
 
     inner class AudioRecordBinder : Binder() {
-        val asrResponseStateFlow: MutableStateFlow<AsrResponse>?
+        val asrStreamResponseStateFlow: MutableStateFlow<AsrStreamResponse>?
             get() = asrClient?.messageFlow
     }
 

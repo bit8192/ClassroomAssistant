@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import android.widget.Toast
@@ -38,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,7 +64,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -84,7 +83,7 @@ class RecordActivity : ComponentActivity() {
         onServiceConnectionListener = {
             lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
-                    audioRecordBinder?.asrResponseStateFlow?.collect { response->
+                    audioRecordBinder?.asrStreamResponseStateFlow?.collect { response->
                         if (response.messageType != FULL_SERVER_RESPONSE.toInt()) return@collect
                         val currentRecorder = vm.fileInfos[vm.pagerState.currentPage]
                         currentRecorder.onMessage(response)
@@ -207,8 +206,7 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
                 }, modifier = Modifier.fillMaxWidth()) { Text("录制音频", modifier = Modifier.padding(85.dp, 15.dp)) }
                 TextButton({
                     showAddContentChooseDialog.value = false
-//                    selectAudioLauncher.launch("audio/*")
-                    Toast.makeText(context, "暂不支持该功能", Toast.LENGTH_SHORT).show()
+                    selectAudioLauncher.launch("audio/*")
                 }, modifier = Modifier.fillMaxWidth()){ Text("本地录音/音频", modifier = Modifier.padding(85.dp, 15.dp)) }
                 TextButton({
                     showAddContentChooseDialog.value = false
@@ -216,7 +214,20 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
                 }, modifier = Modifier.fillMaxWidth()){ Text("图片/照片", modifier = Modifier.padding(85.dp, 15.dp)) }
                 TextButton({
                     showAddContentChooseDialog.value = false
-                    //TODO
+                    if (viewModel.fileInfos.isEmpty()){
+                        Toast.makeText(context, "请至少添加一个素材", Toast.LENGTH_SHORT).show()
+                    }else {
+                        viewModel.save(context)
+                        (context as RecordActivity).also {
+                            it.startActivity(
+                                Intent(context, CourseActivity::class.java)
+                                    .also { intent ->
+                                        intent.putExtra("id", course.value.id)
+                                    }
+                            )
+                            it.finish()
+                        }
+                    }
                 }, modifier = Modifier.fillMaxWidth()){ Text("完成/AI总结", modifier = Modifier.padding(85.dp, 15.dp)) }
             }
         }
@@ -277,7 +288,7 @@ fun RecordView(modifier: Modifier = Modifier, vm: FileInfoViewModel, serviceConn
             modifier = Modifier
                 .padding(0.dp, 30.dp)
                 .size(96.dp)
-                .background(colorResource(R.color.record_button), CircleShape),
+                .background(if (vm.writable.value) colorResource(R.color.record_button) else colorResource(R.color.record_button_disabled), CircleShape),
             onClick = {
                 if (isStart) {
                     vm.stop()
@@ -298,9 +309,21 @@ fun RecordView(modifier: Modifier = Modifier, vm: FileInfoViewModel, serviceConn
                         context.startService(intent)
                     }
                 }
-            }
+            },
+            enabled = vm.writable.value
         ) {
-            Text(if(isStart) "停止" else if (recordTime == 0L) "开始" else "继续", color = Color.White)
+            if (vm.loading.value){
+                CircularProgressIndicator()
+            }else{
+                if (vm.writable.value) {
+                    Text(
+                        if (isStart) "停止" else if (recordTime == 0L) "开始" else "继续",
+                        color = Color.White
+                    )
+                }else{
+                    Text("不可写", color = colorResource(R.color.text_disable))
+                }
+            }
         }
         IconButton(onDelete, modifier = Modifier.size(60.dp, 40.dp)) {
             Icon(Icons.Filled.Delete, contentDescription = "delete")

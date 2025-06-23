@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,17 +63,7 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val permissionCheckChannel = Channel<IntArray>()
-    private val viewModel by viewModels<CourseViewModel> {
-        object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val db = Room.databaseBuilder(
-                    applicationContext,
-                    AppDatabase::class.java, "course-database"
-                ).build()
-                return CourseViewModel(db.courseDao()) as T
-            }
-        }
-    }
+    private val viewModel by viewModels<CourseViewModel>()
 
     private fun addCourse() {
         lifecycleScope.launch {
@@ -210,7 +201,7 @@ fun CourseListScreen(viewModel: CourseViewModel) {
     }
 
     LaunchedEffect(Unit) {
-        viewModel.loadCourses()
+        viewModel.loadCourses(context)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -222,7 +213,7 @@ fun CourseListScreen(viewModel: CourseViewModel) {
         } else {
             PullToRefreshBox(
                 isRefreshing = isLoading,
-                onRefresh = { viewModel.loadCourses() }
+                onRefresh = { viewModel.loadCourses(context) }
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -240,12 +231,18 @@ fun CourseListScreen(viewModel: CourseViewModel) {
 
 @Composable
 fun CourseItem(course: Course) {
+    val context = LocalContext.current
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
+            .clickable {
+               context.startActivity(Intent(context, CourseActivity::class.java).apply {
+                   putExtra("id", course.id)
+               })
+            }
     ) {
         Text(
             text = course.title,
