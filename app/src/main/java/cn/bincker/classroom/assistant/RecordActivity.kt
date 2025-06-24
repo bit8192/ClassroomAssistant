@@ -64,6 +64,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -74,7 +75,6 @@ import cn.bincker.classroom.assistant.ui.theme.ClassroomAssistantTheme
 import cn.bincker.classroom.assistant.vm.FileInfoViewModel
 import cn.bincker.classroom.assistant.vm.RecordActivityViewModel
 import kotlinx.coroutines.launch
-import androidx.core.net.toUri
 
 
 class RecordActivity : ComponentActivity() {
@@ -150,7 +150,6 @@ fun STTList(modifier: Modifier = Modifier, content: List<String>) {
 
 @Composable
 fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel, serviceConnection: RecordServiceConnection) {
-    val blankTitle = remember { mutableStateOf(false) }
     val course = viewModel.course.collectAsState()
     val courseTitle = remember { mutableStateOf("") }
     val pagerState = viewModel.pagerState
@@ -169,7 +168,7 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
         }
     )
     val tabScrollState = rememberScrollState()
-    if (!blankTitle.value && course.value.title.isBlank()){
+    if (!viewModel.generateTitle.value && course.value.title.isBlank()){
         AlertDialog(
             onDismissRequest = {},
             title = {Text("课程名称")},
@@ -179,7 +178,7 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
             confirmButton = {
                 Button({
                     if (course.value.title.isBlank()){
-                        blankTitle.value = true
+                        viewModel.generateTitle.value = true
                     }else{
                         viewModel.setTitle(courseTitle.value)
                     }
@@ -190,7 +189,7 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
             dismissButton = {
                 TextButton({
                     viewModel.setTitle("")
-                    blankTitle.value = true
+                    viewModel.generateTitle.value = true
                 }) {
                     Text("交由AI生成")
                 }
@@ -217,16 +216,7 @@ fun RecordApp(modifier: Modifier = Modifier, viewModel: RecordActivityViewModel,
                     if (viewModel.fileInfos.isEmpty()){
                         Toast.makeText(context, "请至少添加一个素材", Toast.LENGTH_SHORT).show()
                     }else {
-                        viewModel.save(context)
-                        (context as RecordActivity).also {
-                            it.startActivity(
-                                Intent(context, CourseActivity::class.java)
-                                    .also { intent ->
-                                        intent.putExtra("id", course.value.id)
-                                    }
-                            )
-                            it.finish()
-                        }
+                        viewModel.complete(context)
                     }
                 }, modifier = Modifier.fillMaxWidth()){ Text("完成/AI总结", modifier = Modifier.padding(85.dp, 15.dp)) }
             }

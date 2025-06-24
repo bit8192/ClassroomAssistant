@@ -16,15 +16,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.tooling.preview.Preview
+import cn.bincker.classroom.assistant.data.entity.Course
 import cn.bincker.classroom.assistant.ui.theme.ClassroomAssistantTheme
 import cn.bincker.classroom.assistant.vm.CourseActivityViewModel
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.res.colorResource
 
 class CourseActivity : ComponentActivity() {
-    val vm by viewModels<CourseActivityViewModel>()
+    private val vm by viewModels<CourseActivityViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +37,11 @@ class CourseActivity : ComponentActivity() {
                 }
             }
         }
-        vm.loadCourse(this, intent.getIntExtra("id", -1))
+        vm.loadCourse(
+            this,
+            intent.getIntExtra("id", -1),
+            intent.getBooleanExtra("generatedTitle", false)
+        )
     }
 }
 
@@ -50,7 +55,7 @@ fun CourseApp(modifier: Modifier = Modifier, vm: CourseActivityViewModel){
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         Text(reasoningContent, color = colorResource(R.color.text_log))
-        Text(course?.content ?: "", color = colorResource(R.color.text_log))
+        Text(course?.content ?: "")
     }
 }
 
@@ -58,5 +63,7 @@ fun CourseApp(modifier: Modifier = Modifier, vm: CourseActivityViewModel){
 @Composable
 fun Preview(){
     val vm = CourseActivityViewModel()
+    vm.setCourse(Course(0, "title", System.currentTimeMillis(), "summary", emptyList(), "content"))
+    vm.setReasoningContent("ReasoningContent")
     CourseApp(vm = vm)
 }

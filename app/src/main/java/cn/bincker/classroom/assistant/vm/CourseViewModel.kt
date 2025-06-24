@@ -1,6 +1,7 @@
 package cn.bincker.classroom.assistant.vm
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,7 +27,18 @@ class CourseViewModel() : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             _courses.value = applicationContext.db.courseDao().getAllCourses()
+            for (i in _courses.value){
+                Log.d("CourseViewModel.loadCourses", "id=${i.id}")
+            }
             _isLoading.value = false
         }
+    }
+
+    fun deleteCourse(context: Context, course: Course) {
+        val applicationContext = context.applicationContext as ClassroomAssistantApplication
+        viewModelScope.launch {
+            applicationContext.db.courseDao().delete(course)
+        }
+        loadCourses(context)
     }
 }

@@ -11,7 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,11 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import androidx.room.Room
-import cn.bincker.classroom.assistant.data.database.AppDatabase
 import cn.bincker.classroom.assistant.data.entity.Course
 import cn.bincker.classroom.assistant.ui.theme.ClassroomAssistantTheme
 import cn.bincker.classroom.assistant.vm.CourseViewModel
@@ -147,6 +143,11 @@ class MainActivity : ComponentActivity() {
             permissionCheckChannel.send(grantResults)
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadCourses(this)
+    }
 }
 
 
@@ -219,8 +220,8 @@ fun CourseListScreen(viewModel: CourseViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp)
                 ) {
-                    items(courseState, {i->i.id}) { course ->
-                        CourseItem(course = course)
+                    items(courseState, {i->i.id ?: 0}) { course ->
+                        CourseItem(course = course, onDelete = {viewModel.deleteCourse(context, course)})
                         HorizontalDivider()
                     }
                 }
@@ -230,7 +231,7 @@ fun CourseListScreen(viewModel: CourseViewModel) {
 }
 
 @Composable
-fun CourseItem(course: Course) {
+fun CourseItem(course: Course, onDelete: ()->Unit) {
     val context = LocalContext.current
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
@@ -238,11 +239,11 @@ fun CourseItem(course: Course) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable {
+            .combinedClickable(onClick = {
                context.startActivity(Intent(context, CourseActivity::class.java).apply {
                    putExtra("id", course.id)
                })
-            }
+            }, onLongClick = onDelete)
     ) {
         Text(
             text = course.title,

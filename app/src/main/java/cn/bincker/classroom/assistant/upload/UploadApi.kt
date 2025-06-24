@@ -1,7 +1,9 @@
 package cn.bincker.classroom.assistant.upload
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
+import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -17,6 +19,7 @@ import java.io.File
 import java.net.URLEncoder
 import java.time.Duration
 
+
 const val URL_GOFILE = "https://upload.gofile.io/uploadfile"
 const val URL_FILEIO = "https://file.io/"
 const val URL_0X0ST = "https://0x0.st"
@@ -29,10 +32,29 @@ class UploadApi {
         .callTimeout(Duration.ofMinutes(5))
         .build()
 
-    private fun getFilename(file: String): String{
-        val separatorIndex = file.indexOf(File.separator)
-        if (separatorIndex == -1) return file
-        return file.substring(separatorIndex + 1)
+    private fun getFilename(context: Context, file: String): String{
+        if (file.startsWith("content://")){
+            val separatorIndex = file.indexOf(File.separator)
+            var name = if (separatorIndex == -1) file else file.substring(separatorIndex + 1)
+            if (name.contains(":")) name = name.split(":").last()
+            return name + "." + (getUriFileExtension(context, file.toUri()) ?: "bin")
+        }else{
+            val separatorIndex = file.indexOf(File.separator)
+            if (separatorIndex == -1) return file
+            return file.substring(separatorIndex + 1)
+        }
+    }
+
+    private fun getUriFileExtension(context: Context, uri: Uri): String? {
+        val mimeType = context.contentResolver.getType(uri)
+        if (mimeType != null) {
+            val extensionFromMime = MimeTypeMap.getSingleton()
+                .getExtensionFromMimeType(mimeType)
+            if (extensionFromMime != null) {
+                return extensionFromMime
+            }
+        }
+        return null
     }
 
     private fun getFileRequestBody(context: Context, file: String): RequestBody {
@@ -57,7 +79,7 @@ class UploadApi {
     fun uploadFile(context: Context, file: String): String?{
         var request = Request.Builder()
             .url("https://upfile.live/api/file/getUploadLink/")
-            .post("vipCode=&file_name=${URLEncoder.encode(getFilename(file), "utf-8")}".toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType()))
+            .post("vipCode=&file_name=${URLEncoder.encode(getFilename(context, file), "utf-8")}".toRequestBody("application/x-www-form-urlencoded; charset=UTF-8".toMediaType()))
             .build()
         val uploadUrlResponse: GetUploadUrlResponse? = okhttp.newCall(request).execute().use { response->
             var str = response.body.string()
@@ -97,7 +119,7 @@ class UploadApi {
             if (response.isSuccessful){
                 val str = response.body.string()
                 Log.d("UploadApi.uploadFile", "upload completed: $str")
-                val result: UpFileLiveResponse<FileUploadCompleteResponse> = Gson().fromJson<UpFileLiveResponse<FileUploadCompleteResponse>>(str, TypeToken.getParameterized(
+                val result: UpFileLiveResponse<FileUploadCompleteResponse> = Gson().fromJson(str, TypeToken.getParameterized(
                     UpFileLiveResponse::class.java, FileUploadCompleteResponse::class.java) as TypeToken<UpFileLiveResponse<FileUploadCompleteResponse>>)
                 Log.d("UploadApi.uploadFile", "upload completed: https://upfile.live/download/" + result.data?.fileId)
                 "https://upfile.live/download/" + result.data?.fileId

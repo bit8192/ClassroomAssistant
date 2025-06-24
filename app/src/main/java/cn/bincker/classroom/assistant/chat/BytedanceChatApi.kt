@@ -25,11 +25,11 @@ class BytedanceChatApi {
         client.newCall(request).execute().use { response->
             val gson = Gson()
             response.body.charStream().forEachLine {l->
-                if (l.isBlank()) return@forEachLine
+                if (l.isBlank() || l == "[DONE]") return@forEachLine
                 val line = if (l.startsWith("data: ")) l.substring(6) else l
                 try {
-                    val chatResponse: ChatResponse? = gson.fromJson<ChatResponse>(line, ChatResponse::class.java)
-                    if (chatResponse == null) return@forEachLine
+                    val chatResponse: ChatResponse = gson.fromJson<ChatResponse>(line, ChatResponse::class.java)
+                        ?: return@forEachLine
                     callback.invoke(chatResponse)
                 }catch (e: Exception){
                     Log.e("BytedanceChatApi.streamChat", "parse chat response failed: line=$line", e)
